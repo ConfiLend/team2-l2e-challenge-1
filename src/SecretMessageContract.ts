@@ -32,7 +32,7 @@ export class SecretMessageContract extends SmartContract {
   })
 
   events = {
-    "new-message-received": Field
+    "NewMessageReceived": Field
   }
 
   init() {
@@ -140,7 +140,7 @@ export class SecretMessageContract extends SmartContract {
 
     this.totalNumberOfMessages.set(currentState.add(1));
     this.reducer.dispatch({key: user, value: message})
-    this.emitEvent("new-message-received", message);
+    this.emitEvent("NewMessageReceived", message);
   }
 
   @method getUserMessage(user: PublicKey): Field {

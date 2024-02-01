@@ -7,10 +7,10 @@ import {
   Field,
   UInt32,
 } from 'o1js';
-import { TestAccount, updateMessageForInvalidCheck1, updateMessageForInvalidCheck2, updateMessageForInvalidCheck3, updateMessageForValidCheck1, updateMessageForValidCheck2 } from './utils.js';
+import { TestAccount, updateMessageForInvalidCheck1, updateMessageForInvalidCheck2, updateMessageForInvalidCheck3, updateMessageForValidCheck1, updateMessageForValidCheck2, updateMessageForValidCheck3 } from './utils.js';
 
 const AVAILABLE_TEST_ACCOUNTS_IN_LOCAL = 10
-const RANDOM_ADDED_TEST_ACCOUNTS = 98
+const RANDOM_ADDED_TEST_ACCOUNTS = 97
 
 describe('Secret Message service', () => {
   let
@@ -222,15 +222,53 @@ describe('Secret Message service', () => {
     expect(message).toEqual(messageRetrieved)
   
     const events = await zkAppInstance.fetchEvents(UInt32.from(0))
-    expect(events[1].type).toMatch("new-message-received")
+    expect(events[1].type).toMatch("NewMessageReceived")
     expect(events[1].event.data).toEqual(message)
     
   })
 
+  test('a valid message for check3 is sent by eligible address', async () => {
+    // add new user for check3 message
+    const { privateKey: senderKey, publicKey: senderAccount } = localTestAccounts[0];
+    const { privateKey: testKey3, publicKey: testAccount3 } = localTestAccounts[3];
+    // update transaction
+    const txnAddUser = await Mina.transaction(senderAccount, () => {
+      zkAppInstance.addNewUser(testAccount3);
+      zkAppInstance.requireSignature()
+    });
+
+    await txnAddUser.prove();
+    await txnAddUser.sign([senderKey, zkAppPrivateKey]).send();
+  
+    const initialValue = zkAppInstance.totalNumberOfMessages.get();
+
+    // update transaction
+    let message: Field = Field.random()
+    const txn = await Mina.transaction(testAccount3, () => {
+      message = updateMessageForValidCheck3(message)
+      zkAppInstance.sendMessage(message);
+    });
+
+    await txn.prove();
+    await txn.sign([testKey3]).send();
+
+    let messageRetrieved: Field = Field.empty()
+    const txnToGetMessage = await Mina.transaction(testAccount3, () => {
+      messageRetrieved = zkAppInstance.getUserMessage(testAccount3);
+    });
+
+    await txnToGetMessage.prove();
+    await txnToGetMessage.sign([testKey3]).send();
+
+    const updatedNum = zkAppInstance.totalNumberOfMessages.get();
+    expect(updatedNum).toEqual(initialValue.add(1));
+    expect(message).toEqual(messageRetrieved)
+  })
+
   test('hundred users are introduced by an account that is admin', async () => {
-    // there is already 2 users introduced. will be extended to 100.
+    // there is already 3 users introduced. will be extended to 100.
     const initialValue = zkAppInstance.totalNumberOfUsers.get();
-    expect(initialValue).toEqual(Field(2));
+    expect(initialValue).toEqual(Field(3));
 
     const { privateKey: senderKey, publicKey: senderAccount } = localTestAccounts[0];
 
